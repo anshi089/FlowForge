@@ -37,6 +37,32 @@ export function KanbanBoard() {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [socket, setSocket] = useState<any>(null);
 
+  const handleEditTask = async (task: Task) => {
+  const newTitle = window.prompt("Edit title:", task.title);
+  if (!newTitle) return;
+
+  const newDescription = window.prompt(
+    "Edit description:",
+    task.description
+  );
+
+  try {
+    await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/tasks/${task.id}/edit`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTitle,
+          description: newDescription,
+        }),
+      }
+    );
+  } catch (error) {
+    console.error("Failed to update task", error);
+  }
+};
+
   useEffect(() => {
     // Assuming backend runs on 5000 in dev
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -60,6 +86,10 @@ export function KanbanBoard() {
 
     newSocket.on("task-created", (newTask: Task) => {
       setTasks((prev) => [...prev, newTask].sort((a, b) => a.position - b.position));
+    });
+
+    newSocket.on("task-updated", (updatedTask: Task) => {
+      setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
     });
 
     newSocket.on("task-deleted", (taskId: string) => {
@@ -247,6 +277,7 @@ export function KanbanBoard() {
             tasks={tasks.filter((task) => task.status === col.id)}
             onCreateTask={() => handleCreateTask(col.id)}
             onDeleteTask={handleDeleteTask}
+            onEditTask={handleEditTask}
           />
         ))}
       </div>

@@ -41,7 +41,7 @@ export const createTask = async (req, res) => {
   }
 };
 
-// Update task status and position
+//update task status
 export const updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -56,6 +56,59 @@ export const updateTaskStatus = async (req, res) => {
     if (error) throw error;
 
     res.status(200).json(data[0]);
+  } catch (error) {
+    console.error("Error updating task status:", error);
+    res.status(500).json({ error: "Failed to update task status" });
+  }
+};
+
+export const updateTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, status } = req.body;
+    const updateFields = {};
+
+    if (title !== undefined) updateFields.title = title;
+    if (description !== undefined) updateFields.description = description;
+
+    // Validate status if provided
+    const validStatus = ["todo", "in_progress", "done"];
+    if (status !== undefined) {
+      if (!validStatus.includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      updateFields.status = status;
+    }
+
+    // Prevent empty update request
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    // Update task in database
+    const { data, error } = await supabase
+      .from("tasks")
+      .update(updateFields)
+      .eq("id", id)
+      .select();
+
+    if (error) throw error;
+
+    // Handle case where task does not exist
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    const updatedTask = data[0];
+
+    // Emit real-time update event
+    const io = req.app.get("io");
+    if (io && updatedTask) {
+      io.emit("task-updated", updatedTask);
+    }
+
+    // Send updated task as response
+    res.status(200).json(updatedTask);
   } catch (error) {
     console.error("Error updating task:", error);
     res.status(500).json({ error: "Failed to update task" });

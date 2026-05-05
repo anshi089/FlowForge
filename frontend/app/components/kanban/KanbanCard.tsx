@@ -10,9 +10,10 @@ interface Props {
   task: Task;
   isOverlay?: boolean;
   onDelete?: () => void;
+  onEditTask?: (task: Task) => void;
 }
 
-export function KanbanCard({ task, isOverlay, onDelete }: Props) {
+export function KanbanCard({ task, isOverlay, onDelete, onEditTask }: Props) {
   const {
     setNodeRef,
     attributes,
@@ -61,21 +62,37 @@ export function KanbanCard({ task, isOverlay, onDelete }: Props) {
           <h4 className="text-sm font-semibold text-slate-800 leading-tight">{task.title}</h4>
         </div>
         
-        {onDelete && (
+        <div className="flex items-center gap-1">
+          {/* Edit Button */}
           <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-            }}
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              onDelete();
+              onEditTask?.(task);
             }}
-            className="invisible flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-500 group-hover:visible"
-            title="Delete Task"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
+            className="invisible flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-blue-50 hover:text-blue-500 group-hover:visible"
+            title="Edit Task"
+            
+            >
+              ✏️
+            </button>
+
+           {/* Delete Button */}
+            {onDelete && (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="invisible flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-500 group-hover:visible"
+                title="Delete Task"
+
+                >
+                  <Trash2 size={14} />
+                </button>
+            )}
+          </div>
       </div>
       
       {task.description && (
