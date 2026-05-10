@@ -249,8 +249,9 @@ function stopRecording() {
 
 
 return (
-  <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6 md:p-10 relative">
+  <div className="mx-auto relative flex max-w-6xl flex-col gap-6 p-6 md:p-10">
 
+    {/* HEADER */}
     <div className="rounded-3xl border border-(--line) bg-white p-6 shadow-sm">
       <h1 className="text-3xl font-bold text-slate-800">
         Team Chat
@@ -273,192 +274,267 @@ return (
     <div className="flex items-center gap-2 text-sm text-slate-600">
       <div className="h-2 w-2 rounded-full bg-green-500"></div>
 
-      <span className="font-medium">
-        Online:
-      </span>
-    <span>
-      {onlineUsers.join(", ")}
-    </span>
-  </div>
+      <span className="font-medium">Online:</span>
+
+      <span>{onlineUsers.join(", ")}</span>
+    </div>
 
     {/* MESSAGES */}
     <div
-  ref={containerRef}
-  onScroll={() => {
-    const el = containerRef.current;
-    if (!el) return;
+      ref={containerRef}
+      onScroll={() => {
+        const el = containerRef.current;
+        if (!el) return;
 
-    const threshold = 100;
+        const threshold = 100;
 
-    const atBottom =
-      el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+        const atBottom =
+          el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
 
-    isAtBottomRef.current = atBottom;
+        isAtBottomRef.current = atBottom;
 
-    //  reset unread when user reaches bottom
-    if (atBottom) {
-      setUnreadCount(0);
-    }
-  }}
-  className="h-[500px] overflow-y-auto rounded-3xl border border-(--line) bg-white p-5 shadow-sm"
->
-        {messages.map((msg, i) => {
-          const prevMsg = messages[i - 1];
-          const isSameUser = prevMsg && prevMsg.user === msg.user;
-          const isMe = msg.user === username;
+        if (atBottom) {
+          setUnreadCount(0);
+        }
+      }}
+      className="h-[500px] overflow-y-auto rounded-3xl border border-(--line) bg-white p-5 shadow-sm"
+    >
+      {messages.map((msg, i) => {
+        const prevMsg = messages[i - 1];
+        const isSameUser = prevMsg && prevMsg.user === msg.user;
+        const isMe = msg.user === username;
 
-          return (
-            <div key={i} className={`flex ${isMe ? "justify-end" : "justify-start"} ${ isSameUser ? "mt-0.5" : "mt-3"}`}>
-              <div
-                className={`max-w-md rounded-2xl p-4 shadow-sm ${
-                  isMe
+        return (
+          <div
+            key={i}
+            className={`flex ${
+              isMe ? "justify-end" : "justify-start"
+            } ${isSameUser ? "mt-1" : "mt-4"}`}
+          >
+            <div
+              className={`w-fit max-w-[320px] rounded-2xl p-4 shadow-sm ${
+                isMe
                   ? `bg-teal-700 text-white ${
-                    isSameUser
-                    ? "rounded-lg rounded-tr-2xl"
-                    : "rounded-2xl rounded-br-md"
-                  }`
+                      isSameUser
+                        ? "rounded-tr-md"
+                        : "rounded-br-md"
+                    }`
                   : `bg-slate-100 text-slate-800 ${
-                        isSameUser
-                        ? "rounded-lg rounded-tl-2xl"
-                        : "rounded-2xl rounded-bl-md"
-                      }`
-                    }`}
->
-                {/* Show name only for others */}
-                {!isMe && !isSameUser && (
-                      <p className="font-semibold text-sm">{msg.user}</p>
-                )}
+                      isSameUser
+                        ? "rounded-tl-md"
+                        : "rounded-bl-md"
+                    }`
+              }`}
+            >
+              {/* USERNAME */}
+              {!isMe && !isSameUser && (
+                <p className="mb-1 text-sm font-semibold">
+                  {msg.user}
+                </p>
+              )}
 
-                {msg.text && <p>{msg.text}</p>}
+              {/* TEXT */}
+              {msg.text && (
+                <p className="break-words text-sm leading-relaxed">
+                  {msg.text}
+                </p>
+              )}
 
-                {msg.image && (
-                  <img src={msg.image} alt="Shared image" className="mt-2 max-h-64 rounded-xl object-cover"/>
-                )}
-                {msg.audio && (
-                   <audio controls className="mt-3 w-[260px]">
-                   <source src={msg.audio} type="audio/webm" />
-                    </audio>
-                )}
+              {/* IMAGE */}
+              {msg.image && msg.image.startsWith("blob:") && (
+                <img src={msg.image} alt="Shared image" className="mt-3 max-h-52 max-w-[240px] rounded-xl object-cover"/>
+              )}
 
-                  <div className="flex gap-2 mt-1 text-sm">
-                  {["👍", "❤️", "😂"].map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => handleReact(msg.id, emoji)}
-                      className="hover:scale-110 transition"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  {/* counts will show here*/}
-                    {msg.reactions &&
-                      Object.entries(msg.reactions).filter(([_, count]) => count > 0).map(([emoji, count]) => (
-                        <span
+              {/* AUDIO */}
+              {msg.audio && msg.audio.startsWith("blob:") && (
+                <audio
+                  controls
+                  className="mt-3 w-[220px]"
+                >
+                  <source
+                    src={msg.audio}
+                    type="audio/webm"
+                  />
+                </audio>
+              )}
+
+              {/* REACTIONS */}
+              <div className="mt-2 flex flex-wrap gap-2 text-sm">
+                {["👍", "❤️", "😂"].map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() =>
+                      handleReact(msg.id, emoji)
+                    }
+                    className="transition hover:scale-110"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+
+                {msg.reactions &&
+                  Object.entries(msg.reactions)
+                    .filter(([_, count]) => count > 0)
+                    .map(([emoji, count]) => (
+                      <span
                         key={emoji}
-                        className={`px-2 py-0.5 rounded-full text-xs ${isMe ? "bg-white text-black" : "bg-gray-200"}`}
+                        className={`rounded-full px-2 py-0.5 text-xs ${
+                          isMe
+                            ? "bg-white text-black"
+                            : "bg-gray-200"
+                        }`}
                       >
                         {emoji} {count}
                       </span>
                     ))}
-                  </div>
-
-                <p className="mt-2 text-right text-[11px] opacity-60">
-                  {msg.time} {msg.status === "seen" ? "✓✓" : "✓"}
-                </p>
               </div>
+
+              {/* TIME */}
+              <p className="mt-2 text-right text-[11px] opacity-60">
+                {msg.time}{" "}
+                {msg.status === "seen" ? "✓✓" : "✓"}
+              </p>
             </div>
-          );
-        })}
+          </div>
+        );
+      })}
 
-        <div ref={bottomRef}></div>
-      </div>
-      {unreadCount > 0 && (
-  <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10">
-    <button
-      onClick={() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-        setUnreadCount(0);
-      }}
-      className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm shadow hover:bg-blue-600 transition"
-    >
-      {unreadCount} New Message{unreadCount > 1 ? "s" : ""}
-    </button>
-  </div>
-)}
+      <div ref={bottomRef}></div>
+    </div>
 
-      {/* TYPING */}
-      {typingUser && typingUser !== username && (
-        <p className="text-sm italic mt-1">
-          {typingUser} is typing...
-        </p>
-      )}
-      {selectedImage && (
-  <div className="rounded-2xl border border-(--line) bg-white p-3 shadow-sm">
-    <img
-      src={selectedImage}
-      alt="Preview"
-      className="max-h-60 rounded-xl object-cover"
-    />
-  </div>
-)}
-{audioBlob && (
-  <div className="rounded-2xl border border-(--line) bg-white p-4 shadow-sm">
-    <audio controls className="w-full">
-      <source src={audioBlob} type="audio/webm" />
-    </audio>
-  </div>
-)}
-
-      {/* INPUT */}
-<div className="relative mt-4 flex gap-3">
-
-  <div className="relative">
-    <button
-      onClick={() => setShowEmojiPicker((prev) => !prev)}
-      className="flex h-full items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50"
-    >
-      <Smile size={20} className="text-slate-600" />
-    </button>
-
-    {showEmojiPicker && (
-      <div className="absolute bottom-14 left-0 z-50">
-        <EmojiPicker onEmojiClick={handleEmojiClick} />
-      </div>
-    )}
-  </div>
-  <label className="flex cursor-pointer items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50">
-  <Paperclip size={20} className="text-slate-600" />
-
-  <input
-    type="file"
-    accept="image/*"
-    onChange={handleImageUpload}
-    className="hidden"
-  />
-</label>
-<button
-  onClick={isRecording ? stopRecording : startRecording}
-  className={`flex items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50 ${
-    isRecording ? "text-red-500" : "text-slate-600"
-  }`}
->
-  {isRecording ? <Square size={20} /> : <Mic size={20} />}
-</button>
-
-
-  <input
-    value={input}
-    onChange={handleTyping}
-    placeholder="Type message"
-    className="flex-1 rounded-2xl border border-(--line) bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-  />
+    {/* UNREAD MESSAGE */}
+    {unreadCount > 0 && (
+      <div className="absolute bottom-24 left-1/2 z-10 -translate-x-1/2">
         <button
-          onClick={handleSend}
-          className="rounded-2xl bg-teal-700 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-teal-800"
+          onClick={() => {
+            bottomRef.current?.scrollIntoView({
+              behavior: "smooth",
+            });
+
+            setUnreadCount(0);
+          }}
+          className="rounded-full bg-blue-500 px-4 py-1 text-sm text-white shadow transition hover:bg-blue-600"
         >
-          Send
+          {unreadCount} New Message
+          {unreadCount > 1 ? "s" : ""}
         </button>
       </div>
+    )}
+
+    {/* TYPING */}
+    {typingUser && typingUser !== username && (
+      <p className="text-sm italic text-slate-500">
+        {typingUser} is typing...
+      </p>
+    )}
+
+    {/* IMAGE PREVIEW */}
+    {selectedImage && (
+      <div className="rounded-2xl border border-(--line) bg-white p-3 shadow-sm">
+        <img
+          src={selectedImage}
+          alt="Preview"
+          className="max-h-40 rounded-xl object-cover"
+        />
+      </div>
+    )}
+
+    {/* RECORDING */}
+    {isRecording && (
+      <p className="animate-pulse text-sm font-medium text-red-500">
+        Recording voice message...
+      </p>
+    )}
+
+    {/* AUDIO PREVIEW */}
+    {audioBlob && (
+      <div className="rounded-2xl border border-(--line) bg-white p-4 shadow-sm">
+        <audio controls className="w-full">
+          <source
+            src={audioBlob}
+            type="audio/webm"
+          />
+        </audio>
+      </div>
+    )}
+
+    {/* INPUT SECTION */}
+    <div className="relative mt-4 flex gap-3">
+
+      {/* EMOJI */}
+      <div className="relative">
+        <button
+          onClick={() =>
+            setShowEmojiPicker((prev) => !prev)
+          }
+          className="flex h-full items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50"
+        >
+          <Smile
+            size={20}
+            className="text-slate-600"
+          />
+        </button>
+
+        {showEmojiPicker && (
+          <div className="absolute bottom-14 left-0 z-50">
+            <EmojiPicker
+              onEmojiClick={handleEmojiClick}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* FILE UPLOAD */}
+      <label className="flex cursor-pointer items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50">
+        <Paperclip
+          size={20}
+          className="text-slate-600"
+        />
+
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          className="hidden"
+        />
+      </label>
+
+      {/* VOICE */}
+      <button
+        onClick={
+          isRecording
+            ? stopRecording
+            : startRecording
+        }
+        className={`flex items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50 ${
+          isRecording
+            ? "text-red-500"
+            : "text-slate-600"
+        }`}
+      >
+        {isRecording ? (
+          <Square size={20} />
+        ) : (
+          <Mic size={20} />
+        )}
+      </button>
+
+      {/* MESSAGE INPUT */}
+      <input
+        value={input}
+        onChange={handleTyping}
+        placeholder="Type message"
+        className="flex-1 rounded-2xl border border-(--line) bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+      />
+
+      {/* SEND BUTTON */}
+      <button
+        onClick={handleSend}
+        className="rounded-2xl bg-teal-700 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:scale-105 hover:bg-teal-800"
+      >
+        Send
+      </button>
     </div>
-  );
+  </div>
+);
 }
