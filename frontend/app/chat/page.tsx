@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
+import EmojiPicker from "emoji-picker-react";
+import { Smile, Paperclip, Mic, Square } from "lucide-react";
 
 type Message = {
   id?: string;
@@ -9,6 +11,8 @@ type Message = {
   text: string;
   time?: string;
   status?: string;
+  image?: string;
+  audio?: string;
   reactions?: { [emoji: string]: number };
 };
 
@@ -18,6 +22,13 @@ export default function ChatPage() {
   const [username, setUsername] = useState("");
   const [typingUser, setTypingUser] = useState("");
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+const [audioBlob, setAudioBlob] = useState<string | null>(null);
+
+const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+const audioChunksRef = useRef<Blob[]>([]);
 
   const socketRef = useRef<Socket | null>(null);
   const typingTimeoutRef = useRef<any>(null);
@@ -48,6 +59,9 @@ export default function ChatPage() {
 
 // NEW MESSAGE
 socket.on("newMessage", (msg) => {
+  // prevent duplicate message for sender
+  if (msg.username === username) return;
+
   setMessages((prev) => [
     ...prev,
     {
@@ -59,7 +73,6 @@ socket.on("newMessage", (msg) => {
     },
   ]);
 
-  //  new logic
   if (!isAtBottomRef.current) {
     setUnreadCount((prev) => prev + 1);
   }
@@ -91,14 +104,10 @@ socket.on("newMessage", (msg) => {
       );
     });
     socket.on("reactionUpdate", ({ messageId, reactions }) => {
-  setMessages((prev) =>
-    prev.map((msg) =>
-      msg.id === messageId
-        ? { ...msg, reactions }
-        : msg
-    )
-  );
-});
+      setMessages((prev) =>
+      prev.map((msg) =>
+      msg.id === messageId ? { ...msg, reactions } : msg ));
+    });
 
     return () => {
       socket.disconnect();
@@ -119,7 +128,7 @@ socket.on("newMessage", (msg) => {
     }
   }, [messages]);
 
-  // MARK ONLY LAST MESSAGE AS SEEN (FIXED)
+  // MARK ONLY LAST MESSAGE AS SEEN 
   useEffect(() => {
     if (!socketRef.current) return;
 
@@ -131,18 +140,42 @@ socket.on("newMessage", (msg) => {
 
   // SEND
   async function handleSend() {
-    if (!input.trim() || !username.trim()) return;
+  if ((!input.trim() && !selectedImage && !audioBlob) || !username.trim()) return;
 
-    await fetch("http://localhost:5000/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text: input, username }),
-    });
+  const localMessage: Message = {
+  id: Date.now().toString(),
+  user: username,
+  text: input,
+  image: selectedImage || undefined,
+  audio: audioBlob || undefined,
+  time: new Date().toLocaleTimeString(),
+  status: "sent",
+};
 
-    setInput("");
-  }
+  // immediately show message in UI
+  setMessages((prev) => [...prev, localMessage]);
+
+  // send text to backend
+  await fetch("http://localhost:5000/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: input,
+      username,
+    }),
+  });
+
+  // clear inputs
+  setInput("");
+  setSelectedImage(null);
+  setAudioBlob(null);
+  // auto scroll
+  bottomRef.current?.scrollIntoView({
+    behavior: "smooth",
+  });
+}
 
   // TYPING
   function handleTyping(e: any) {
@@ -152,12 +185,64 @@ socket.on("newMessage", (msg) => {
       socketRef.current.emit("typing", username);
     }
   }
-  function handleReact(messageId: string | undefined, emoji: string) {
-  if (!messageId) return;
+  //emoji select function
+  function handleEmojiClick(emojiData: any) {
+    setInput((prev) => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
+  }
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
 
-  // send reaction to server
-  socketRef.current?.emit("react", { messageId, emoji, username,});
+    if (!file) return;
+
+        const imageUrl = URL.createObjectURL(file);
+        setSelectedImage(imageUrl);
+  }
+
+  async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+
+    const mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorderRef.current = mediaRecorder;
+
+    audioChunksRef.current = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunksRef.current.push(event.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: "audio/webm",
+      });
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      setAudioBlob(audioUrl);
+    };
+
+    mediaRecorder.start();
+
+    setIsRecording(true);
+  } catch (error) {
+    console.error("Recording failed:", error);
+  }
 }
+function stopRecording() {
+  mediaRecorderRef.current?.stop();
+  setIsRecording(false);
+}
+
+  function handleReact(messageId: string | undefined, emoji: string) {
+    if (!messageId) return;
+
+    // send reaction to server
+    socketRef.current?.emit("react", { messageId, emoji, username,});
+  }
 
 
   
@@ -223,14 +308,9 @@ return (
           const isMe = msg.user === username;
 
           return (
-            <div
-  key={i}
-  className={`flex ${isMe ? "justify-end" : "justify-start"} ${
-    isSameUser ? "mt-0.5" : "mt-3"
-  }`}
->
+            <div key={i} className={`flex ${isMe ? "justify-end" : "justify-start"} ${ isSameUser ? "mt-0.5" : "mt-3"}`}>
               <div
-                className={`max-w-sm rounded-2xl p-4 shadow-sm ${
+                className={`max-w-md rounded-2xl p-4 shadow-sm ${
                   isMe
                   ? `bg-teal-700 text-white ${
                     isSameUser
@@ -249,8 +329,18 @@ return (
                       <p className="font-semibold text-sm">{msg.user}</p>
                 )}
 
-                <p>{msg.text}</p>
-                <div className="flex gap-2 mt-1 text-sm">
+                {msg.text && <p>{msg.text}</p>}
+
+                {msg.image && (
+                  <img src={msg.image} alt="Shared image" className="mt-2 max-h-64 rounded-xl object-cover"/>
+                )}
+                {msg.audio && (
+                   <audio controls className="mt-3 w-[260px]">
+                   <source src={msg.audio} type="audio/webm" />
+                    </audio>
+                )}
+
+                  <div className="flex gap-2 mt-1 text-sm">
                   {["👍", "❤️", "😂"].map((emoji) => (
                     <button
                       key={emoji}
@@ -302,15 +392,66 @@ return (
           {typingUser} is typing...
         </p>
       )}
+      {selectedImage && (
+  <div className="rounded-2xl border border-(--line) bg-white p-3 shadow-sm">
+    <img
+      src={selectedImage}
+      alt="Preview"
+      className="max-h-60 rounded-xl object-cover"
+    />
+  </div>
+)}
+{audioBlob && (
+  <div className="rounded-2xl border border-(--line) bg-white p-4 shadow-sm">
+    <audio controls className="w-full">
+      <source src={audioBlob} type="audio/webm" />
+    </audio>
+  </div>
+)}
 
       {/* INPUT */}
-      <div className="mt-4 flex gap-3">
-        <input
-          value={input}
-          onChange={handleTyping}
-          placeholder="Type message"
-          className="flex-1 rounded-2xl border border-(--line) bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-        />
+<div className="relative mt-4 flex gap-3">
+
+  <div className="relative">
+    <button
+      onClick={() => setShowEmojiPicker((prev) => !prev)}
+      className="flex h-full items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50"
+    >
+      <Smile size={20} className="text-slate-600" />
+    </button>
+
+    {showEmojiPicker && (
+      <div className="absolute bottom-14 left-0 z-50">
+        <EmojiPicker onEmojiClick={handleEmojiClick} />
+      </div>
+    )}
+  </div>
+  <label className="flex cursor-pointer items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50">
+  <Paperclip size={20} className="text-slate-600" />
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={handleImageUpload}
+    className="hidden"
+  />
+</label>
+<button
+  onClick={isRecording ? stopRecording : startRecording}
+  className={`flex items-center rounded-2xl border border-(--line) bg-white px-4 shadow-sm transition hover:bg-slate-50 ${
+    isRecording ? "text-red-500" : "text-slate-600"
+  }`}
+>
+  {isRecording ? <Square size={20} /> : <Mic size={20} />}
+</button>
+
+
+  <input
+    value={input}
+    onChange={handleTyping}
+    placeholder="Type message"
+    className="flex-1 rounded-2xl border border-(--line) bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+  />
         <button
           onClick={handleSend}
           className="rounded-2xl bg-teal-700 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-teal-800"
